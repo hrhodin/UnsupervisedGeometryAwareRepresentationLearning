@@ -18,7 +18,10 @@ Features
 ===================
 Modern 3D human pose estimation techniques rely on deep  networks, which require large amounts of training data. In  this work, we propose to overcome this problem by learning  a geometry-aware body representation from multi-view images without 3D annotations. To this end, we use an encoder-decoder  that predicts an image from one viewpoint given an image  from another viewpoint. Because this representation encodes 3D geometry, using it in a semi-supervised setting makes it  easier to learn a mapping from it to 3D human pose. As  evidenced by our experiments, our approach significantly  outperforms fully-supervised methods given the same amount  of labeled data, and improves over other semi-supervised  methods while using as little as 1% of the labeled data.
 
-* Pytorch network definition
+The provided pytorch implementation provides
+-------------------
+
+* Network definition (image encoder, image decoder and pose decoder)
 * Training code
 * Interactive test code
 

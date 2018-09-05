@@ -22,8 +22,8 @@ The provided pytorch implementation provides
 -------------------
 
 * Network definition (image encoder, image decoder and pose decoder)
-* Training code
 * Interactive test code
+* Training code (requires the H36M dataset)
 
 Minimal Dependencies
 ===================

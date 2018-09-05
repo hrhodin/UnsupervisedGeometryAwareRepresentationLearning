@@ -21,7 +21,7 @@ Modern 3D human pose estimation techniques rely on deep  networks, which require
 The provided pytorch implementation provides
 -------------------
 
-* Network definition (image encoder, image decoder and pose decoder)
+* Network definition and weights (image encoder, image decoder and pose decoder)
 * Interactive test code
 * Training code (requires the H36M dataset)
 

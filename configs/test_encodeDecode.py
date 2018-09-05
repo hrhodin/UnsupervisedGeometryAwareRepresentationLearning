@@ -23,7 +23,7 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
 
         # load data
         device='cuda'
-        if 0: # load small example data
+        if 1: # load small example data
             import pickle
             data_loader = pickle.load(open('examples/test_set.pickl',"rb"))
         else:

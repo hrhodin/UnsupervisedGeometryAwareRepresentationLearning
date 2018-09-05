@@ -10,6 +10,7 @@ else:
     config_dict = utils_io.loadModule("configs/config_train_encodeDecode.py").config_dict
     config_dict['pretrained_network_path'] = './examples/network_best_val_t1.pth'
     if not os.path.exists(config_dict['pretrained_network_path']):
+        os.mkdir('./examples')
         import urllib.request
         print("Downloading pre-trained weights, can take a while...")
         urllib.request.urlretrieve("http://icwww.epfl.ch/~rhodin/ECCV2018/network_best_val_t1.pth",

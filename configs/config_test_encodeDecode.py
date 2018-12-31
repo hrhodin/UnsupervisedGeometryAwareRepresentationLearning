@@ -17,5 +17,6 @@ else:
     if not os.path.exists(config_dict['pretrained_network_path']):
         import urllib.request
         print("Downloading pre-trained weights, can take a while...")
-        urllib.request.urlretrieve("http://icwww.epfl.ch/~rhodin/ECCV2018/network_best_val_t1.pth",config_dict['pretrained_network_path'])
+        urllib.request.urlretrieve("http://documents.epfl.ch/groups/c/cv/cvlab-unit/www/data/ECCV2018Rhodin/network_best_val_t1.pth",
+                                   config_dict['pretrained_network_path'])
         print("Downloading done.")

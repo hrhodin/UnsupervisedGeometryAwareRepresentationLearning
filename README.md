@@ -34,6 +34,8 @@ For testing a pre-trained model only the following packages are required:
 * matplotlib
 * pickle
 
+Moreover you will need an X Windows System (e.g.,XQuartz for mac) to run the interactive demo.
+
 Test the pretrained model
 =======================
 
@@ -42,7 +44,7 @@ A pre-trained model can then be tested with
 python configs/test_encodeDecode.py
 ```
 
-It outputs synthesized views and 3D pose estimates with matplotlib. Different view angles can be explored interactively through slider input. It should look like this:
+It outputs synthesized views and 3D pose estimates with matplotlib. Note that this requires an X Window System when exectued on a remote server, e.g., ssh -Y name@server.com. Different view angles can be explored interactively through slider input. It should look like this:
 
 ![NVS and pose viewer image](./example.png "NVS and pose viewer")
 

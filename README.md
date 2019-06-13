@@ -47,7 +47,7 @@ python configs/test_encodeDecode.py
 
 It outputs synthesized views and 3D pose estimates with matplotlib. Note that this requires an X Window System when exectued on a remote server, e.g., ssh -Y name@server.com. Different view angles can be explored interactively through slider input. It should look like this:
 
-![NVS and pose viewer image](./example.png "NVS and pose viewer")
+![NVS and pose viewer image](./examples/example.png "NVS and pose viewer")
 
 Training Dependencies
 ======================

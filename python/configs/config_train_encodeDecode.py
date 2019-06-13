@@ -36,12 +36,14 @@ config_dict = {
     'train_crop_relative' : False,
 
     # dataset
+    'dataset_folder_train' : '/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-train',
+    'dataset_folder_test' : '/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-test',
+    #'dataset_folder' :'/Users/rhodin/H36M-MultiView-test',
     'training_set' : 'h36m',
     'img_mean' : (0.485, 0.456, 0.406),
     'img_std' : (0.229, 0.224, 0.225),
     'actor_subset' : [1,5,6,7,8], # all training subjects
-    'actor_subset_3Dpose' : [1,9,11],
-    'active_cameras' : False, 
+    'active_cameras' : False,
     'inputDimension' : inputDimension,
     'mirror_augmentation' : False,
     'perspectiveCorrection' : True,
@@ -51,7 +53,7 @@ config_dict = {
     'seam_scaling' : 1.0,
     'useCamBatches' : 4,
     'useSubjectBatches' : True,
-    'every_nth_frame' : 1,
+    'every_nth_frame' : 100,
     
     'note' : 'resL3',
 
@@ -120,7 +122,7 @@ if 1:
     config_dict['MAE'] = True
 
 # smaller unsupervised subsets
-if 0:
+if 1:
     config_dict['actor_subset'] = [1,5,6,7,8]
     #config_dict['actor_subset'] = [1,5,6]
-    #config_dict['actor_subset'] = [1,5]
+    config_dict['actor_subset'] = [1]

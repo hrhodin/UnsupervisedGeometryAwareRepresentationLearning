@@ -81,9 +81,11 @@ class CollectedDataset(data.Dataset):
 
 class CollectedDatasetSampler(data.sampler.Sampler):
     def __init__(self, data_folder, batch_size,
+                 actor_subset=None,
                  useSubjectBatches=0, useCamBatches=0,
                  randomize=True,
-                 useSequentialFrames=0):
+                 useSequentialFrames=0,
+                 every_nth_frame=1):
         # save function arguments
         for arg,val in list(locals().items()):
             setattr(self, arg, val)
@@ -93,63 +95,47 @@ class CollectedDatasetSampler(data.sampler.Sampler):
         print('Loading h5 label file to memory')
         label_dict = {key: np.array(value) for key, value in h5_label_file.items()}
         self.label_dict = label_dict
-        config_hash = "cb{}_".format(useCamBatches)
-        all_keys_name = data_folder + '/' +config_hash+ 'all_keys.pickl'
-        sequence_keys_name = data_folder + '/' +config_hash+ 'sequence_keys.pickl'
-        camsets_name = data_folder + '/' +config_hash+ 'camsets.pickl'
-        sequential_name = data_folder + '/' +config_hash+ 'sequential_list.pickl'
-        print('Done loading h5 label file')
-        if os.path.exists(sequence_keys_name):
-            print('Loading sequence-subject-cam association from pickle files {}.'.format(sequence_keys_name))
-            self.all_keys = pickle.load(open(all_keys_name, "rb"))
-            self.sequence_keys = pickle.load(open(sequence_keys_name, "rb"))
-            self.camsets = pickle.load(open(camsets_name, "rb"))
-            print('Done loading sequence association.')
-        else:
-            print('Establishing sequence association. Available labels:', list(label_dict.keys()))
-            all_keys = set()
-            camsets = {}
-            sequence_keys = {}
-            data_length = len(label_dict['frame'])
-            with tqdm(total=data_length) as pbar:
-                for index in range(data_length):
-                    pbar.update(1)
-                    sub_i = int(label_dict['subj'][index].item())
-                    cam_i = int(label_dict['cam'][index].item())
-                    seq_i = int(label_dict['seq'][index].item())
-                    frame_i = int(label_dict['frame'][index].item())
+        print('Establishing sequence association. Available labels:', list(label_dict.keys()))
+        all_keys = set()
+        camsets = {}
+        sequence_keys = {}
+        data_length = len(label_dict['frame'])
+        with tqdm(total=data_length) as pbar:
+            for index in range(data_length):
+                pbar.update(1)
+                sub_i = int(label_dict['subj'][index].item())
+                cam_i = int(label_dict['cam'][index].item())
+                seq_i = int(label_dict['seq'][index].item())
+                frame_i = int(label_dict['frame'][index].item())
 
-                    key = (sub_i, seq_i, frame_i)
-                    if key not in camsets:
-                        camsets[key] = {}
-                    camsets[key][cam_i] = index
+                if actor_subset is not None and sub_i not in actor_subset:
+                    continue
 
-                    # only add if accumulated enough cameras
-                    if len(camsets[key]) >= self.useCamBatches:
-                        all_keys.add(key)
+                key = (sub_i, seq_i, frame_i)
+                if key not in camsets:
+                    camsets[key] = {}
+                camsets[key][cam_i] = index
 
-                        if seq_i not in sequence_keys:
-                            sequence_keys[seq_i] = set()
-                        sequence_keys[seq_i].add(key)
+                # only add if accumulated enough cameras
+                if len(camsets[key]) >= self.useCamBatches:
+                    all_keys.add(key)
 
-            with tqdm(total=data_length) as pbar:
-                sequential_name
+                    if seq_i not in sequence_keys:
+                        sequence_keys[seq_i] = set()
+                    sequence_keys[seq_i].add(key)
 
-            self.all_keys = list(all_keys)
-            self.camsets = camsets
-            self.sequence_keys = {seq: list(keyset) for seq, keyset in sequence_keys.items()}
-            pickle.dump(self.all_keys, open(all_keys_name, "wb"))
-            pickle.dump(self.sequence_keys, open(sequence_keys_name, "wb"))
-            pickle.dump(self.camsets, open(camsets_name, "wb"))
-            print("DictDataset: Done initializing, listed {} camsets ({} frames) and {} sequences".format(
-                                                len(self.camsets), len(self.all_keys), len(sequence_keys)))
+        self.all_keys = list(all_keys)
+        self.camsets = camsets
+        self.sequence_keys = {seq: list(keyset) for seq, keyset in sequence_keys.items()}
+        print("DictDataset: Done initializing, listed {} camsets ({} frames) and {} sequences".format(
+                                            len(self.camsets), len(self.all_keys), len(sequence_keys)))
 
     def __iter__(self):
         index_list = []
-        if self.useCamBatches == 0:
-            index_list = range(len(self.all_keys))
-        else:
-            for index in range(len(self.all_keys)):
+        print("Randomizing dataset (CollectedDatasetSampler.__iter__)")
+        with tqdm(total=len(self.all_keys)//self.every_nth_frame) as pbar:
+            for index in range(0,len(self.all_keys), self.every_nth_frame):
+                pbar.update(1)
                 key = self.all_keys[index]
                 def getCamSubbatch(key):
                     camset = self.camsets[key]
@@ -157,7 +143,11 @@ class CollectedDatasetSampler(data.sampler.Sampler):
                     assert self.useCamBatches <= len(cam_keys)
                     if self.randomize:
                         shuffle(cam_keys)
-                    cam_indices = [camset[k] for k in cam_keys[:self.useCamBatches]]
+                    if self.useCamBatches == 0:
+                        cam_subset_size = 99
+                    else:
+                        cam_subset_size = self.useCamBatches
+                    cam_indices = [camset[k] for k in cam_keys[:cam_subset_size]]
                     return cam_indices
 
                 index_list = index_list + getCamSubbatch(key)

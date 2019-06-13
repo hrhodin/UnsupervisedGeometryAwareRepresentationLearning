@@ -22,7 +22,7 @@ from matplotlib.widgets import Slider, Button
 
 # load data
 if torch.cuda.is_available():
-    device = "cuda"
+    device = "cuda:0"
 else:
     device = "cpu"
 
@@ -33,7 +33,7 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
 
         if 1: # load small example data
             import pickle
-            data_loader = pickle.load(open('examples/test_set.pickl',"rb"))
+            data_loader = pickle.load(open('../examples/test_set.pickl',"rb"))
         else:
             data_loader = self.load_data_test(config_dict)
             # save example data
@@ -43,7 +43,7 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
                 data_iterator = iter(data_loader)
                 data_cach = [next(data_iterator) for i in range(10)]
                 data_cach = tuple(data_cach)
-                pickle.dump(data_cach, open('examples/test_set.pickl', "wb"))
+                pickle.dump(data_cach, open('../examples/test_set.pickl', "wb"))
 
         # load model
         model = self.load_network(config_dict)
@@ -138,7 +138,7 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
             # gt 3D poses
             gt_pose = label_dict['3D'][0]
             R_cam_2_world = label_dict['extrinsic_rot_inv'][0].numpy()
-            R_world_in_cam = la.inv(R_cam_2_world) @ input_dict['external_rotation_global'].numpy() @ R_cam_2_world
+            R_world_in_cam = la.inv(R_cam_2_world) @ input_dict['external_rotation_global'].cpu().numpy() @ R_cam_2_world
             pose_rotated = R_world_in_cam @ gt_pose.numpy().reshape([-1, 3]).T
             utils_plt.plot_3Dpose_simple(ax_gt_skel, pose_rotated, bones=utils_skel.bones_h36m,
                                          plot_handles=handle_gt_skel)

@@ -37,7 +37,7 @@ from ignite._utils import convert_tensor
 from ignite.engine import Events
 
 if torch.cuda.is_available():
-    device = "cuda"
+    device = "cuda:0"
 else:
     device = "cpu"
 
@@ -214,31 +214,29 @@ class IgniteTrainNVS:
         return optimizer
     
     def load_data_train(self,config_dict):
-        data_folder = '/Users/rhodin/H36M-MultiView-test'
-        # data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-train',
-        dataset = collected_dataset.CollectedDataset(data_folder=data_folder,
+        dataset = collected_dataset.CollectedDataset(data_folder=config_dict['dataset_folder_train'],
             input_types=config_dict['input_types'], label_types=config_dict['label_types_train'])
 
-        batch_sampler = collected_dataset.CollectedDatasetSampler(data_folder=data_folder,
-            useSubjectBatches=config_dict['useSubjectBatches'], useCamBatches=config_dict['useCamBatches'],
-            batch_size=config_dict['batch_size_train'],
-            randomize=True)
+        batch_sampler = collected_dataset.CollectedDatasetSampler(data_folder=config_dict['dataset_folder_train'],
+              actor_subset=config_dict['actor_subset'],
+              useSubjectBatches=config_dict['useSubjectBatches'], useCamBatches=config_dict['useCamBatches'],
+              batch_size=config_dict['batch_size_train'],
+              randomize=True,
+              every_nth_frame=config_dict['every_nth_frame'])
 
         loader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0, pin_memory=False,
                                              collate_fn=utils_data.default_collate_with_string)
         return loader
     
     def load_data_test(self,config_dict):
-        data_folder = '/Users/rhodin/H36M-MultiView-test'
-        # data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-test',
-
-        dataset = collected_dataset.CollectedDataset(data_folder=data_folder,
+        dataset = collected_dataset.CollectedDataset(data_folder=config_dict['dataset_folder_test'],
             input_types=config_dict['input_types'], label_types=config_dict['label_types_test'])
 
-        batch_sampler = collected_dataset.CollectedDatasetSampler(data_folder=data_folder,
+        batch_sampler = collected_dataset.CollectedDatasetSampler(data_folder=config_dict['dataset_folder_test'],
             useSubjectBatches=0, useCamBatches=config_dict['useCamBatches'],
             batch_size=config_dict['batch_size_test'],
-            randomize=True)
+            randomize=True,
+            every_nth_frame=config_dict['every_nth_frame'])
 
         loader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0, pin_memory=False,
                                              collate_fn=utils_data.default_collate_with_string)
@@ -274,8 +272,8 @@ class IgniteTrainNVS:
         return loss_train, loss_test
     
     def get_parameter_description(self, config_dict):#, config_dict):
-        folder = "./output/trainNVS_{note}_{encoderType}_layers{num_encoding_layers}_implR{implicit_rotation}_s3Dp{actor_subset_3Dpose}_w3Dp{loss_weight_pose3D}_w3D{loss_weight_3d}_wRGB{loss_weight_rgb}_wGrad{loss_weight_gradient}_wImgNet{loss_weight_imageNet}_skipBG{latent_bg}_fg{latent_fg}_3d{skip_background}_lh3Dp{n_hidden_to3Dpose}_ldrop{latent_dropout}_billin{upsampling_bilinear}_fscale{feature_scale}_shuffleFG{shuffle_fg}_shuffle3d{shuffle_3d}_{training_set}_nth{every_nth_frame}_c{active_cameras}_sub{actor_subset}_bs{useCamBatches}_lr{learning_rate}_".format(**config_dict)
-        folder = folder.replace(' ','').replace('./','[DOT_SHLASH]').replace('.','o').replace('[DOT_SHLASH]','./').replace(',','_')
+        folder = "../output/trainNVS_{note}_{encoderType}_layers{num_encoding_layers}_implR{implicit_rotation}_w3Dp{loss_weight_pose3D}_w3D{loss_weight_3d}_wRGB{loss_weight_rgb}_wGrad{loss_weight_gradient}_wImgNet{loss_weight_imageNet}_skipBG{latent_bg}_fg{latent_fg}_3d{skip_background}_lh3Dp{n_hidden_to3Dpose}_ldrop{latent_dropout}_billin{upsampling_bilinear}_fscale{feature_scale}_shuffleFG{shuffle_fg}_shuffle3d{shuffle_3d}_{training_set}_nth{every_nth_frame}_c{active_cameras}_sub{actor_subset}_bs{useCamBatches}_lr{learning_rate}_".format(**config_dict)
+        folder = folder.replace(' ','').replace('../','[DOT_SHLASH]').replace('.','o').replace('[DOT_SHLASH]','../').replace(',','_')
         #config_dict['storage_folder'] = folder
         return folder
         

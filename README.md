@@ -33,6 +33,7 @@ For testing a pre-trained model only the following packages are required:
 * numpy
 * matplotlib
 * pickle
+* imageio
 
 Moreover you will need an X Windows System (e.g.,XQuartz for mac) to run the interactive demo.
 

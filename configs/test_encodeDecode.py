@@ -1,6 +1,9 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import matplotlib.pyplot as plt
 
-import sys
 import torch
 import numpy as np
 import numpy.linalg as la
@@ -17,12 +20,17 @@ from ignite.engine import Events
 
 from matplotlib.widgets import Slider, Button
 
+# load data
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
+
 class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
     def run(self, config_dict_file, config_dict):
         config_dict['n_hidden_to3Dpose'] = config_dict.get('n_hidden_to3Dpose', 2)
 
-        # load data
-        device='cuda'
+
         if 1: # load small example data
             import pickle
             data_loader = pickle.load(open('examples/test_set.pickl',"rb"))
@@ -72,7 +80,7 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
         def nextImage():
             nonlocal input_dict, label_dict
             input_dict, label_dict = next(data_iterator)
-            input_dict['external_rotation_global'] = torch.from_numpy(np.eye(3)).float().cuda()
+            input_dict['external_rotation_global'] = torch.from_numpy(np.eye(3)).float().to(device)
         nextImage()
 
 
@@ -130,7 +138,7 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
             # gt 3D poses
             gt_pose = label_dict['3D'][0]
             R_cam_2_world = label_dict['extrinsic_rot_inv'][0].numpy()
-            R_world_in_cam = la.inv(R_cam_2_world) @ input_dict['external_rotation_global'] @ R_cam_2_world
+            R_world_in_cam = la.inv(R_cam_2_world) @ input_dict['external_rotation_global'].numpy() @ R_cam_2_world
             pose_rotated = R_world_in_cam @ gt_pose.numpy().reshape([-1, 3]).T
             utils_plt.plot_3Dpose_simple(ax_gt_skel, pose_rotated, bones=utils_skel.bones_h36m,
                                          plot_handles=handle_gt_skel)
@@ -149,8 +157,8 @@ class IgniteTestNVS(train_encodeDecode.IgniteTrainNVS):
             rot = slider_yaw_glob.val
             print("Rotationg ",rot)
             batch_size = input_dict['img_crop'].size()[0]
-            input_dict['external_rotation_global'] = torch.from_numpy(rotationMatrixXZY(theta=0, phi=0, psi=rot)).float().cuda()
-            input_dict['external_rotation_cam'] = torch.from_numpy(np.eye(3)).float().cuda() # torch.from_numpy(rotationMatrixXZY(theta=0, phi=rot, psi=0)).float().cuda()
+            input_dict['external_rotation_global'] = torch.from_numpy(rotationMatrixXZY(theta=0, phi=0, psi=rot)).float().to(device)
+            input_dict['external_rotation_cam'] = torch.from_numpy(np.eye(3)).float().to(device) # torch.from_numpy(rotationMatrixXZY(theta=0, phi=rot, psi=0)).float().cuda()
             predict()
             update_figure()
 

@@ -1,4 +1,8 @@
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import os
 import csv
 import numpy as np
 import torch
@@ -22,15 +26,11 @@ import pickle
 class CollectedDataset(data.Dataset):
     def __init__(self, data_folder, 
                  input_types, label_types,
-                 useSubjectBatches=0, useCamBatches=0,
-                 randomize=True,
                  mean=(0.485, 0.456, 0.406),
                  stdDev= (0.229, 0.224, 0.225),
                  useSequentialFrames=0,
                  ):
-        args = list(locals().items())
-        # save function arguments
-        for arg,val in args:
+        for arg,val in list(locals().items()):
             setattr(self, arg, val)
 
         class Image256toTensor(object):
@@ -47,77 +47,28 @@ class CollectedDataset(data.Dataset):
             torchvision.transforms.Normalize(self.mean, self.stdDev)
         ])
 
-        # build cam/subject datastructure
-        h5_label_file = h5py.File(data_folder+'/labels.h5', 'r')
+        h5_label_file = h5py.File(data_folder + '/labels.h5', 'r')
         print('Loading h5 label file to memory')
-        self.label_dict = {key: np.array(value) for key,value in h5_label_file.items()}
-        all_keys_name = data_folder+'/all_keys.pickl'
-        sequence_keys_name = data_folder+'/sequence_keys.pickl'
-        camsets_name = data_folder+'/camsets.pickl'
-        print('Done loading h5 label file')
-        if os.path.exists(sequence_keys_name):
-            print('Loading sequence-subject-cam association from pickle files {}.'.format(sequence_keys_name))
-            self.all_keys = pickle.load( open(all_keys_name, "rb" ) )
-            self.sequence_keys = pickle.load( open(sequence_keys_name, "rb" ) )
-            self.camsets = pickle.load( open(camsets_name, "rb" ) )
-            print('Done loading sequence association.')
-        else:
-            print('Establishing sequence association. Available labels:',list(h5_label_file.keys()))
-            all_keys = set()
-            camsets = {}
-            sequence_keys = {}
-            data_length = len(h5_label_file['frame'])
-            with tqdm(total=data_length) as pbar:
-                for index in range(data_length):
-                    pbar.update(1)
-                    sub_i = int(h5_label_file['subj'][index].item())
-                    cam_i = int(h5_label_file['cam'][index].item())
-                    seq_i = int(h5_label_file['seq'][index].item())
-                    frame_i = int(h5_label_file['frame'][index].item())
-                    
-                    key = (sub_i,seq_i,frame_i)
-                    if key not in camsets:
-                        camsets[key] = {}
-                    camsets[key][cam_i] = index
-                    
-                    # only add if accumulated enough cameras
-                    if len(camsets[key])>=useCamBatches:
-                        all_keys.add(key)
-        
-                        if seq_i not in sequence_keys:
-                            sequence_keys[seq_i] = set()
-                        sequence_keys[seq_i].add(key)
-                
-            self.all_keys = list(all_keys)
-            self.camsets = camsets
-            self.sequence_keys = {seq: list(keyset) for seq,keyset in sequence_keys.items()}
-            pickle.dump(self.all_keys, open(all_keys_name, "wb" ) )
-            pickle.dump(self.sequence_keys, open(sequence_keys_name, "wb" ) )
-            pickle.dump(self.camsets, open(camsets_name, "wb" ) )
-            print("DictDataset: Done initializing, listed {} camsets ({} frames) and {} sequences".format(self.__len__(), self.__len__()*useCamBatches, len(sequence_keys)))
-                   
+        self.label_dict = {key: np.array(value) for key, value in h5_label_file.items()}
+
     def __len__(self):
-        if self.useCamBatches > 0:
-            return len(self.all_keys)
-        else:
-            return len(self.label_dict['frame'])
+        return len(self.label_dict['frame'])
                
     def getLocalIndices(self, index):
         input_dict = {}
         cam = int(self.label_dict['cam'][index].item())
         seq = int(self.label_dict['seq'][index].item())
         frame = int(self.label_dict['frame'][index].item())
-        return cam, seq, frame, index
+        return cam, seq, frame
 
-    def getItemIntern(self, cam, seq, frame, index):
+    def __getitem__(self, index):
+        cam, seq, frame = self.getLocalIndices(index)
         def getImageName(key):
-            return self.data_folder+'/seq_{:03d}/cam_{:02d}/{}_{:06d}.png'.format(seq,cam,key,frame)
+            return self.data_folder + '/seq_{:03d}/cam_{:02d}/{}_{:06d}.png'.format(seq, cam, key, frame)
         def loadImage(name):
-#             if not os.path.exists(name):
-#                 print('Image not available ({})'.format(name))
-#                 raise Exception('Image not available')
+            #             if not os.path.exists(name):
+            #                 raise Exception('Image not available ({})'.format(name))
             return np.array(self.transform_in(imageio.imread(name)), dtype='float32')
-
         def loadData(types):
             new_dict = {}
             for key in types:
@@ -126,60 +77,123 @@ class CollectedDataset(data.Dataset):
                 else:
                     new_dict[key] = np.array(self.label_dict[key][index], dtype='float32')
             return new_dict
-
         return loadData(self.input_types), loadData(self.label_types)
 
-    def __getitem__(self, index):
-        if self.useSequentialFrames > 1:
-            frame_skip = 1  # 6:1 sec, since anyways subsampled at 5 frames
-            #cam, seq, frame = getLocalIndices(index)
+class CollectedDatasetSampler(data.sampler.Sampler):
+    def __init__(self, data_folder, batch_size,
+                 useSubjectBatches=0, useCamBatches=0,
+                 randomize=True,
+                 useSequentialFrames=0):
+        # save function arguments
+        for arg,val in list(locals().items()):
+            setattr(self, arg, val)
 
-            # ensure that a sequence is not exceeded
-            for i in range(self.useSequentialFrames):
-                cam_skip = 4
-                index_range = list(range(index+i, index+i + self.useSequentialFrames * frame_skip*cam_skip, frame_skip*cam_skip))
-                #print('index_range',index_range,'seq',[int(self.label_dict['seq'][i]) for i in index_range])
-                #print('index_range',index_range,'frame',[int(self.label_dict['frame'][i]) for i in index_range])
-                #print('index_range',index_range,'cam',[int(self.label_dict['cam'][i]) for i in index_range])
-                if len(self.label_dict['seq'])>index_range[-1] and self.label_dict['seq'][index_range[0]] == self.label_dict['seq'][index_range[-1]]:
-                    break
-
-            # collect single results
-            single_examples = [self.getItemIntern(*self.getLocalIndices(i)) for i in index_range]
-            collated_examples = utils_data.default_collate_with_string(single_examples) #accumulate list of single frame results
-            return collated_examples
-        if self.useCamBatches > 0:
-            key = self.all_keys[index]           
-            def getCamSubbatch(key):
-                camset = self.camsets[key]
-                cam_keys = list(camset.keys())
-                assert self.useCamBatches <= len(cam_keys)
-                if self.randomize:
-                    shuffle(cam_keys)
-                cam_keys_shuffled = cam_keys[:self.useCamBatches]
-                return [self.getItemIntern(*self.getLocalIndices(camset[cami])) for cami in cam_keys_shuffled]
-            
-            single_examples = getCamSubbatch(key)
-            if self.useSubjectBatches > 0:
-                #subj = key[0]
-                seqi = key[1]
-                potential_keys = self.sequence_keys[seqi]
-                key_other = potential_keys[np.random.randint(len(potential_keys))]
-                single_examples = single_examples + getCamSubbatch(key_other)
-            
-            collated_examples = utils_data.default_collate_with_string(single_examples) #accumulate list of single frame results
-            return collated_examples
+        # build cam/subject datastructure
+        h5_label_file = h5py.File(data_folder + '/labels.h5', 'r')
+        print('Loading h5 label file to memory')
+        label_dict = {key: np.array(value) for key, value in h5_label_file.items()}
+        self.label_dict = label_dict
+        config_hash = "cb{}_".format(useCamBatches)
+        all_keys_name = data_folder + '/' +config_hash+ 'all_keys.pickl'
+        sequence_keys_name = data_folder + '/' +config_hash+ 'sequence_keys.pickl'
+        camsets_name = data_folder + '/' +config_hash+ 'camsets.pickl'
+        sequential_name = data_folder + '/' +config_hash+ 'sequential_list.pickl'
+        print('Done loading h5 label file')
+        if os.path.exists(sequence_keys_name):
+            print('Loading sequence-subject-cam association from pickle files {}.'.format(sequence_keys_name))
+            self.all_keys = pickle.load(open(all_keys_name, "rb"))
+            self.sequence_keys = pickle.load(open(sequence_keys_name, "rb"))
+            self.camsets = pickle.load(open(camsets_name, "rb"))
+            print('Done loading sequence association.')
         else:
-            return self.getItemIntern(*self.getLocalIndices(index))
+            print('Establishing sequence association. Available labels:', list(label_dict.keys()))
+            all_keys = set()
+            camsets = {}
+            sequence_keys = {}
+            data_length = len(label_dict['frame'])
+            with tqdm(total=data_length) as pbar:
+                for index in range(data_length):
+                    pbar.update(1)
+                    sub_i = int(label_dict['subj'][index].item())
+                    cam_i = int(label_dict['cam'][index].item())
+                    seq_i = int(label_dict['seq'][index].item())
+                    frame_i = int(label_dict['frame'][index].item())
+
+                    key = (sub_i, seq_i, frame_i)
+                    if key not in camsets:
+                        camsets[key] = {}
+                    camsets[key][cam_i] = index
+
+                    # only add if accumulated enough cameras
+                    if len(camsets[key]) >= self.useCamBatches:
+                        all_keys.add(key)
+
+                        if seq_i not in sequence_keys:
+                            sequence_keys[seq_i] = set()
+                        sequence_keys[seq_i].add(key)
+
+            with tqdm(total=data_length) as pbar:
+                sequential_name
+
+            self.all_keys = list(all_keys)
+            self.camsets = camsets
+            self.sequence_keys = {seq: list(keyset) for seq, keyset in sequence_keys.items()}
+            pickle.dump(self.all_keys, open(all_keys_name, "wb"))
+            pickle.dump(self.sequence_keys, open(sequence_keys_name, "wb"))
+            pickle.dump(self.camsets, open(camsets_name, "wb"))
+            print("DictDataset: Done initializing, listed {} camsets ({} frames) and {} sequences".format(
+                                                len(self.camsets), len(self.all_keys), len(sequence_keys)))
+
+    def __iter__(self):
+        index_list = []
+        if self.useCamBatches == 0:
+            index_list = range(len(self.all_keys))
+        else:
+            for index in range(len(self.all_keys)):
+                key = self.all_keys[index]
+                def getCamSubbatch(key):
+                    camset = self.camsets[key]
+                    cam_keys = list(camset.keys())
+                    assert self.useCamBatches <= len(cam_keys)
+                    if self.randomize:
+                        shuffle(cam_keys)
+                    cam_indices = [camset[k] for k in cam_keys[:self.useCamBatches]]
+                    return cam_indices
+
+                index_list = index_list + getCamSubbatch(key)
+                if self.useSubjectBatches:
+                    seqi = key[1]
+                    potential_keys = self.sequence_keys[seqi]
+                    key_other = potential_keys[np.random.randint(len(potential_keys))]
+                    index_list = index_list + getCamSubbatch(key_other)
+
+        subject_batch_factor = 1+int(self.useSubjectBatches > 0) # either 1 or 2
+        cam_batch_factor = max(1,self.useCamBatches)
+        sub_batch_size = cam_batch_factor*subject_batch_factor
+        assert len(index_list) % sub_batch_size == 0
+        indices_batched = np.array(index_list).reshape([-1,sub_batch_size])
+        if self.randomize:
+            indices_batched = np.random.permutation(indices_batched)
+        indices_batched = indices_batched.reshape([-1])[:(indices_batched.size//self.batch_size)*self.batch_size] # drop last frames
+        return iter(indices_batched.reshape([-1,self.batch_size]))
+
 
 if __name__ == '__main__':
     dataset = CollectedDataset(
-                 data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-test',
-                 input_types=['img_crop','bg_crop'], label_types=['3D'],
-                 useSubjectBatches=2, useCamBatches=4,
+                 data_folder='/Users/rhodin/H36M-MultiView-test',
+                 input_types=['img_crop','bg_crop'], label_types=['3D'])
+
+    batch_sampler = CollectedDatasetSampler(
+                 data_folder='/Users/rhodin/H36M-MultiView-test',
+                 useSubjectBatches=1, useCamBatches=2,
+                 batch_size=8,
                  randomize=True)
 
-    for i in range(len(dataset)):
-        data = dataset.__getitem__(i)
+    trainloader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler,
+                                              num_workers=0, pin_memory=False,
+                                              collate_fn=utils_data.default_collate_with_string)
+
+    # iterate over batches
+    for input, labels in iter(trainloader):
         IPython.embed()
 

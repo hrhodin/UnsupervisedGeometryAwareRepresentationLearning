@@ -144,7 +144,7 @@ def save_model_state(save_path, engine, current_loss, model, optimizer, state):
         state_variables = {key:value for key, value in engine.state.__dict__.items() if key in ['iteration','metrics']}
         pickle.dump(state_variables, open(os.path.join(model_path,"state_best_val_t1.pickle"),'wb'))
 
-# Fix of original Ignite Loss to not depend on single tensor output but to acept dicts
+# Fix of original Ignite Loss to not depend on single tensor output but to accept dictionaries
 from ignite.metrics import Metric
 class AccumulatedLoss(Metric):
     """
@@ -189,16 +189,11 @@ def transfer_partial_weights(state_dict_other, obj, submodule=0, prefix=None, ad
     copyCount = 0
     skipCount = 0
     paramCount = len(own_state)
-    #for name_raw, param in own_state.items():
-    #    paramCount += param.view(-1).size()[0]
-    #for name_raw, param in state_dict_other.items():
-    #    print("param",param)
 
     for name_raw, param in state_dict_other.items():
         if isinstance(param, torch.nn.Parameter):
             # backwards compatibility for serialized parameters
             param = param.data
-            #print('.data conversion for ',name)
         if prefix is not None and not name_raw.startswith(prefix):
             #print("skipping {} because of prefix {}".format(name_raw, prefix))
             continue

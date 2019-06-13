@@ -220,6 +220,7 @@ class unet(nn.Module):
 
     def forward(self, input_dict):
         input = input_dict['img_crop']
+        device = input.device
         batch_size = input.size()[0]
         num_pose_examples = batch_size//2
         num_appearance_examples = batch_size//2
@@ -272,9 +273,9 @@ class unet(nn.Module):
 #        print('self.training',self.training,"shuffled_appearance",shuffled_appearance)
 #        print("shuffled_pose      ",shuffled_pose)
             
-        shuffled_appearance = A.Variable(torch.LongTensor(shuffled_appearance)).cuda()
-        shuffled_pose       = A.Variable(torch.LongTensor(shuffled_pose)).cuda()
-        shuffled_pose_inv   = A.Variable(torch.LongTensor(shuffled_pose_inv)).cuda()
+        shuffled_appearance = torch.LongTensor(shuffled_appearance).to(device)
+        shuffled_pose       = torch.LongTensor(shuffled_pose).to(device)
+        shuffled_pose_inv   = torch.LongTensor(shuffled_pose_inv).to(device)
 
         if rotation_by_user:
             if 'shuffled_appearance' in input_dict.keys():

@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import matplotlib.pyplot as plt
 
 from datasets import collected_dataset
@@ -32,19 +36,16 @@ sys.path.insert(0,'./ignite')
 from ignite._utils import convert_tensor
 from ignite.engine import Events
 
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
+
 class IgniteTrainNVS:
     def run(self, config_dict_file, config_dict):
-        config_dict_test = {k:v for k,v in config_dict.items()}
-        config_dict_cams = {k:v for k,v in config_dict.items()}
+        #config_dict_test = {k:v for k,v in config_dict.items()}
+        #config_dict_cams = {k:v for k,v in config_dict.items()}
         
-        # no appearance fliping on test
-        config_dict_test['useSubjectBatches'] = 0
-        
-        # ensure correct batch size after flattening
-        config_dict_test    ['batch_size_test'] = config_dict['batch_size_test']//max(1,config_dict['useCamBatches'])
-        config_dict_cams    ['batch_size_train'] = config_dict['batch_size_train']//max(1,config_dict['useSubjectBatches'])//max(1,config_dict['useCamBatches'])
-        config_dict_cams    ['batch_size_test']  = config_dict['batch_size_test'] //max(1,config_dict['useSubjectBatches'])//max(1,config_dict['useCamBatches'])
-    
         # some default values
         config_dict['implicit_rotation'] = config_dict.get('implicit_rotation', False)
         config_dict['skip_background'] = config_dict.get('skip_background', True)
@@ -60,20 +61,19 @@ class IgniteTrainNVS:
             print("WARNING: Visdom server not running. Please run python -m visdom.server to see visual output")
         except ImportError:
             vis = None
-            raise RuntimeError("WARNING: No visdom package is found. Please install it with command: \n pip install visdom to see visual output")
+            print("WARNING: No visdom package is found. Please install it with command: \n pip install visdom to see visual output")
+            #raise RuntimeError("WARNING: No visdom package is found. Please install it with command: \n pip install visdom to see visual output")
         vis_windows = {}
     
         # save path and config files
         save_path = self.get_parameter_description(config_dict)
-        model_path = os.path.join(save_path,"models/")
         utils_io.savePythonFile(config_dict_file, save_path)
         utils_io.savePythonFile(__file__, save_path)
         
         # now do training stuff
         epochs = 40
-        device='cuda'
-        train_loader = self.load_data_train(config_dict_cams)
-        test_loader = self.load_data_test(config_dict_test)
+        train_loader = self.load_data_train(config_dict)
+        test_loader = self.load_data_test(config_dict)
         model = self.load_network(config_dict)
         model = model.to(device)
         optimizer = self.loadOptimizer(model,config_dict)
@@ -91,8 +91,6 @@ class IgniteTrainNVS:
              
         @trainer.on(Events.ITERATION_COMPLETED)
         def log_training_progress(engine):
-            #nonlocal vis_windows
-    
             # log the loss
             iteration = engine.state.iteration - 1
             if iteration % config_dict['print_every'] == 0:
@@ -108,7 +106,6 @@ class IgniteTrainNVS:
             iteration = engine.state.iteration - 1
             if (iteration+1) % config_dict['test_every'] != 0: # +1 to prevent evaluation at iteration 0
                 return
-            #nonlocal vis_windows
             print("Running evaluation at iteration",iteration)
             evaluator.run(test_loader)
             avg_accuracy = utils_train.save_testing_error(save_path, engine, evaluator, vis, vis_windows)
@@ -123,13 +120,13 @@ class IgniteTrainNVS:
             if iteration in [0,100]:
                 utils_train.save_test_example(save_path, trainer, evaluator, vis, vis_windows, config_dict)
     
-    # kick everything off
+        # kick everything off
         trainer.run(train_loader, max_epochs=epochs)
         
     def load_network(self, config_dict):
         output_types= config_dict['output_types']
         
-        use_billinear_upsampling = 'upsampling_bilinear' in config_dict.keys() and config_dict['upsampling_bilinear']
+        use_billinear_upsampling = config_dict.get('upsampling_bilinear', False)
         lower_billinear = 'upsampling_bilinear' in config_dict.keys() and config_dict['upsampling_bilinear'] == 'half'
         upper_billinear = 'upsampling_bilinear' in config_dict.keys() and config_dict['upsampling_bilinear'] == 'upper'
         
@@ -163,24 +160,24 @@ class IgniteTrainNVS:
                                             skip_background=config_dict['skip_background'],
                                             num_cameras=num_cameras,
                                             )
-        
+
         if 'pretrained_network_path' in config_dict.keys(): # automatic
             if config_dict['pretrained_network_path'] == 'MPII2Dpose':
                 pretrained_network_path = '/cvlabdata1/home/rhodin/code/humanposeannotation/output_save/CVPR18_H36M/TransferLearning2DNetwork/h36m_23d_crop_relative_s1_s5_aug_from2D_2017-08-22_15-52_3d_resnet/models/network_000000.pth'
                 print("Loading weights from MPII2Dpose")
-                pretrained_states = torch.load(pretrained_network_path)
+                pretrained_states = torch.load(pretrained_network_path, map_location=device)
                 utils_train.transfer_partial_weights(pretrained_states, network_single, submodule=0, add_prefix='encoder.') # last argument is to remove "network.single" prefix in saved network
             else:
                 print("Loading weights from config_dict['pretrained_network_path']")
                 pretrained_network_path = config_dict['pretrained_network_path']            
-                pretrained_states = torch.load(pretrained_network_path)
+                pretrained_states = torch.load(pretrained_network_path, map_location=device)
                 utils_train.transfer_partial_weights(pretrained_states, network_single, submodule=0) # last argument is to remove "network.single" prefix in saved network
                 print("Done loading weights from config_dict['pretrained_network_path']")
         
         if 'pretrained_posenet_network_path' in config_dict.keys(): # automatic
             print("Loading weights from config_dict['pretrained_posenet_network_path']")
             pretrained_network_path = config_dict['pretrained_posenet_network_path']            
-            pretrained_states = torch.load(pretrained_network_path)
+            pretrained_states = torch.load(pretrained_network_path, map_location=device)
             utils_train.transfer_partial_weights(pretrained_states, network_single.to_pose, submodule=0) # last argument is to remove "network.single" prefix in saved network
             print("Done loading weights from config_dict['pretrained_posenet_network_path']")
         return network_single
@@ -217,38 +214,37 @@ class IgniteTrainNVS:
         return optimizer
     
     def load_data_train(self,config_dict):
-        #return load_data_test(config_dict) # HACK
-    
-        #factory = dataset_factory.DatasetFactory()
-        #trainloader, valloader_UNUSED = factory.load_data_train(config_dict_cams)
-        dataset = collected_dataset.CollectedDataset(
-                 data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-train',
-                 input_types=config_dict['input_types'], label_types=config_dict['label_types_train'],
-                 useSubjectBatches=config_dict['useSubjectBatches'], useCamBatches=config_dict['useCamBatches'], # HACK
-                 useSequentialFrames=config_dict.get('useSequentialFrames',0),
-                 randomize=True)
-        trainloader = torch.utils.data.DataLoader(dataset, batch_size=config_dict['batch_size_train'], shuffle=True, num_workers=config_dict['num_workers'], pin_memory=False, drop_last=True, collate_fn=utils_data.default_collate_with_string)
-        trainloader = utils_data.PostFlattenInputSubbatchTensor(trainloader)        
-        return trainloader
+        data_folder = '/Users/rhodin/H36M-MultiView-test'
+        # data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-train',
+        dataset = collected_dataset.CollectedDataset(data_folder=data_folder,
+            input_types=config_dict['input_types'], label_types=config_dict['label_types_train'])
+
+        batch_sampler = collected_dataset.CollectedDatasetSampler(data_folder=data_folder,
+            useSubjectBatches=config_dict['useSubjectBatches'], useCamBatches=config_dict['useCamBatches'],
+            batch_size=config_dict['batch_size_train'],
+            randomize=True)
+
+        loader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0, pin_memory=False,
+                                             collate_fn=utils_data.default_collate_with_string)
+        return loader
     
     def load_data_test(self,config_dict):
-        #factory = dataset_factory.DatasetFactory()
-        #testloader = factory.load_data_test(config_dict_test)
-        dataset = collected_dataset.CollectedDataset(
-                 data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-test',
-                 input_types=config_dict['input_types'], label_types=config_dict['label_types_test'],
-                 useSubjectBatches=0, useCamBatches=config_dict['useCamBatches'],
-                 randomize=False)
-        testloader = torch.utils.data.DataLoader(dataset, batch_size=config_dict['batch_size_test'], shuffle=False, num_workers=config_dict['num_workers'], pin_memory=False, drop_last=True, collate_fn=utils_data.default_collate_with_string)
-        testloader = utils_data.PostFlattenInputSubbatchTensor(testloader)
-        return testloader
+        data_folder = '/Users/rhodin/H36M-MultiView-test'
+        # data_folder='/cvlabdata1/home/rhodin/code/humanposeannotation/python/pytorch_human_reconstruction/TMP/H36M-MultiView-test',
+
+        dataset = collected_dataset.CollectedDataset(data_folder=data_folder,
+            input_types=config_dict['input_types'], label_types=config_dict['label_types_test'])
+
+        batch_sampler = collected_dataset.CollectedDatasetSampler(data_folder=data_folder,
+            useSubjectBatches=0, useCamBatches=config_dict['useCamBatches'],
+            batch_size=config_dict['batch_size_test'],
+            randomize=True)
+
+        loader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0, pin_memory=False,
+                                             collate_fn=utils_data.default_collate_with_string)
+        return loader
     
     def load_loss(self, config_dict):
-        weight = 1
-        if config_dict['training_set'] in ['h36m','h36m_mpii']:
-            weight = 17 / 16  # becasue spine is set to root = 0
-        print("MPJPE test weight = {}, to normalize different number of joints".format(weight))
-    
         # normal
         if config_dict.get('MAE', False):
             pairwise_loss = torch.nn.modules.loss.L1Loss()

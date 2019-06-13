@@ -10,8 +10,8 @@ config_dict = {
     'config_class_file': 'dict_configs/config_class_encodeDecode.py',
     'input_types'       : ['img_crop','extrinsic_rot','extrinsic_rot_inv','bg_crop'],
     'output_types'      : ['3D','img_crop'],
-    'label_types_train' : ['img_crop','3D','bounding_box_cam','intrinsic_crop','extrinsic_rot','extrinsic_rot_inv'], #'3D',
-    'label_types_test'  : ['img_crop','3D','bounding_box_cam','intrinsic_crop','extrinsic_rot','extrinsic_rot_inv'], #'3D',
+    'label_types_train' : ['img_crop','3D','bounding_box_cam','intrinsic_crop','extrinsic_rot','extrinsic_rot_inv'],
+    'label_types_test'  : ['img_crop','3D','bounding_box_cam','intrinsic_crop','extrinsic_rot','extrinsic_rot_inv'],
     'num_workers'       : 8,
     
     # problem class parameters
@@ -50,12 +50,12 @@ config_dict = {
     'scale_augmentation' : False,
     'seam_scaling' : 1.0,
     'useCamBatches' : 4,
+    'useSubjectBatches' : True,
     'every_nth_frame' : 1,
     
     'note' : 'resL3',
 
     # encode decode
-    'useSubjectBatches' : 2,
     'latent_bg' : 0,
     'latent_fg' : 24,
     'latent_3d' : 200*3,
@@ -75,7 +75,6 @@ config_dict = {
     'implicit_rotation' : False,
     'predict_rotation' : False,
     'skip_background' : True,
-    
 }
 
 # learning rate influence

@@ -1,14 +1,11 @@
 import torch
-import matplotlib.pyplot as plt
-
-import IPython
 import numpy as np
-
 from models import resnet_low_level
 
-import IPython
-
-from models import resnet_low_level
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
 
 class SobelCriterium(torch.nn.Module):
     """
@@ -53,7 +50,7 @@ class ImageNetCriterium(torch.nn.Module):
         self.net = resnet_low_level.resnet18(pretrained=True, num_channels = 3, do_maxpooling=do_maxpooling)
         for p in self.net.parameters():
             p.requires_grad = False
-        self.net.cuda()
+        self.net.to(device)
         
     def forward(self, pred, label):
         preds_x  = self.net(pred)

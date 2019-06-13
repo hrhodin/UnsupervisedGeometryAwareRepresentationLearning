@@ -11,9 +11,6 @@ from utils import plotting as utils_plt
 from utils import skeleton as util_skel
 import torch
 
-import IPython
-import scipy.ndimage.filters
-
 def normalize_mean_std_tensor(pose_tensor, label_dict):
     pose_mean = label_dict["pose_mean"]
     pose_std  = label_dict["pose_std"]
@@ -146,7 +143,7 @@ def plot_iol(inputs_raw, labels_raw, outputs_dict, config_dict, keyword, image_n
     if not hasattr(plot_iol, 'created_sub_plots_last'):
         plot_iol.created_sub_plots_last = {}
     if keyword not in plot_iol.created_sub_plots_last:
-        plot_iol.created_sub_plots_last[keyword] = 100 # some defaul value to fit all..
+        plot_iol.created_sub_plots_last[keyword] = 100 # some large defaul value to fit all..
         # call recursively once, to determine number of subplots
         plot_iol(inputs_raw, labels_raw, outputs_dict, config_dict, keyword, image_name)
         
@@ -412,10 +409,10 @@ def plot_iol(inputs_raw, labels_raw, outputs_dict, config_dict, keyword, image_n
         created_sub_plots += 1
         ax_img = fig.add_subplot(num_subplots_rows,num_subplots_columns,created_sub_plots)
         ax_img.set_title("shuffling\n3d: {} \nfg: {}".format(shuffle_out.numpy(),shuffle_fg.numpy()), size='4')
-                 
-    print("Writing image to {} at dpi={}".format(image_name,config_dict['dpi']))
-    plt.savefig(image_name,  dpi=config_dict['dpi'], transparent=True)
-    #plt.savefig(img_name,  dpi=300)
+
+    if plot_iol.created_sub_plots_last[keyword] == created_sub_plots: # Don't save the dummy run that determines the number of plots
+        plt.savefig(image_name,  dpi=config_dict['dpi'], transparent=True)
+        print("Written image to {} at dpi={}".format(image_name, config_dict['dpi']))
 
     if verbose:
         plt.show()

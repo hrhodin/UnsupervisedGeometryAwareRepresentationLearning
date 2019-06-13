@@ -56,7 +56,7 @@ def plot3Dcylinder(ax, p0, p1, radius=5, color=(0.5, 0.5, 0.5)):
         not_v = np.array([0, 1, 0])
     #make vector perpendicular to v
     n1 = np.cross(v, not_v)
-    n1 /= la.norm(n1)
+    n1 /= eps+la.norm(n1)
     #make unit vector perpendicular to v and n1
     n2 = np.cross(v, n1)
     #surface ranges over t from 0 to length of axis and 0 to 2*pi

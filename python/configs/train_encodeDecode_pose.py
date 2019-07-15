@@ -10,6 +10,7 @@ import sys, os, shutil
 from utils import io as utils_io
 import numpy as np
 import torch
+torch.cuda.current_device() # to prevent  "Cannot re-initialize CUDA in forked subprocess." error on some configurations
 import torch.optim
 #import pickle
 import IPython

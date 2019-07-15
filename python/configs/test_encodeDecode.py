@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import matplotlib.pyplot as plt
 
 import torch
+torch.cuda.current_device() # to prevent  "Cannot re-initialize CUDA in forked subprocess." error on some configurations
 import numpy as np
 import numpy.linalg as la
 import IPython

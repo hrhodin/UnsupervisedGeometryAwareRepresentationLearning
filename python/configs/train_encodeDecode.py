@@ -22,6 +22,7 @@ from losses import images as losses_images
 
 import math
 import torch
+torch.cuda.current_device() # to prevent  "Cannot re-initialize CUDA in forked subprocess." error on some configurations
 import torch.optim
 import torchvision
 import torchvision.transforms as transforms

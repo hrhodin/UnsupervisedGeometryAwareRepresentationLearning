@@ -3,6 +3,15 @@ import torch
 class Criterion3DPose_leastQuaresScaled(torch.nn.Module):
     """
     Normalize the scale in the least squares sense, then apply the specified criterion
+    
+    Let p be the prediction, g the GT, and s the sought scale. We find the s that minimizes
+      min_x ||s p - q||^2
+    = min_x (s p - q) * (s p - q)
+    Take the derivative and set to zero to find min:
+        2 p * (s p -g) = 0
+    <=> s p * p - p * g = 0
+    <=> s = p * g / (p * p)
+    where * is the dot product
     """
     def __init__(self, criterion):
         super(Criterion3DPose_leastQuaresScaled, self).__init__()
